@@ -5,15 +5,28 @@ import random
 import json
 import os
 import re
+import time
+import csv
+import concurrent.futures
 from urllib.parse import urlencode
 from lxml import etree
 from bs4 import BeautifulSoup
 
 
+def rotate_proxy(proxy):
+    try:
+        r = requests.get('https://httpbin.org/ip', proxies={'http': proxy, 'https': proxy}, timeout=2)
+    except:
+        pass
+    return proxy
+
 def generate_dataset(topic, root_folder, desired_records):
     path = os.path.join(root_folder, topic)
     links_path = os.path.join(root_folder, "links")
     num_records = 0
+
+    # Black list urls that contain these substrings for better results.
+    blacklist_url = ["youtube", "netflix", "amazon", "twitter", "pdf"]
     payload = {
         # Query.
         'q': f'{topic}',
@@ -37,16 +50,28 @@ def generate_dataset(topic, root_folder, desired_records):
         )
     }
 
+    # proxies = {
+    #     'https': 'https://124.121.92.216:80',
+    #     'http': 'http://217.97.101.134:80'
+    # }
     count = 0
 
     while True:
         if num_records >= desired_records:
             break
+
         payload['start'] = count
+
         # Encode our payload parameters for search.
         params = urlencode(payload)
         url = f'https://www.google.com/search?{params}'
-        response = requests.get(url, headers=headers, timeout=4)
+
+        # Add 2 second sleep to avoid getting blacklisted by google.
+        time.sleep(3)
+        response = requests.get(url, headers=headers, timeout=2)
+        if response.status_code == 429:
+            print("Scraper detected")
+            break
         soup = BeautifulSoup(response.content, "html.parser")
         dom = etree.HTML(str(soup))
 
@@ -55,6 +80,9 @@ def generate_dataset(topic, root_folder, desired_records):
         result_elements = dom.xpath('//div[@class="yuRUbf"]/a')
 
         for element in result_elements:
+            test = [x for x in blacklist_url if x in element.attrib['href']]
+            if len(test) > 0:
+                continue
             results.append(element.attrib['href'])
 
         links_file = os.path.join(links_path, f'{topic}_links.json')
@@ -67,7 +95,7 @@ def generate_dataset(topic, root_folder, desired_records):
                 break
             try:
                 response = requests.get(url, headers=headers, timeout=5)
-            except Exception:
+            except:
                 # catch request exception and keep trying new urls.
                 continue
 
@@ -105,11 +133,12 @@ def extract_text(soup_string):
         'input',
         'script',
         'style',
-        'a'
+        'a',
+        'footer'
     ]
 
     # Stop words that are common in text documents. I.e not helpful for text analysis.
-    stopwords = ["font", "header", "empty", "noscript", "lynx", "br", "flyout", "ff", "text", "react", "div", "a", "about", "above", "after", "again", "against", "all", "am",
+    stopwords = ["icon", "external", "plus", "font", "header", "empty", "noscript", "lynx", "br", "flyout", "ff", "text", "react", "div", "a", "about", "above", "after", "again", "against", "all", "am",
                  "an", "and", "any", "are", "as", "at", "be", "because", "been", "before", "being", "below", "between",
                  "both", "but", "by", "could", "did", "do", "does", "doing", "down", "during", "each", "few", "for",
                  "from", "further", "had", "has", "have", "having", "he", "he'd", "he'll", "he's", "her", "here",
@@ -125,11 +154,11 @@ def extract_text(soup_string):
 
     for t in soup_string:
         # Only append text from useful elements.
-        if t.parent.name not in blacklist:
+        if t.parent.name == "p":
             text = t.string
             text = re.sub("[^A-Za-z0-9 ]+", " ", text.lower().strip())
             output += f'{text} '
-    output = [w for w in output.split() if len(w) > 1 and not w.isdigit() and w not in stopwords]
+    output = [w for w in output.split() if len(w) > 1 and not w.isdigit() and w not in stopwords and d.check(w)]
 
     words_in_dict = len([w for w in output if d.check(w)])
     if len(output) == 0:
@@ -143,9 +172,10 @@ def extract_text(soup_string):
 
 
 def main():
-    root_folder = 'dataset'
-    topics = ["racing", "coffee", "WW2"]
-    num_examples = 100
+    #r = requests.get('https://httpbin.org/ip')
+    root_folder = 'dataset2'
+    topics = ["technology", "gardening", "health"]
+    num_examples = 80
     try:
         os.mkdir(root_folder)
     except FileExistsError:
