@@ -1,24 +1,35 @@
-import json
+import datetime
 import os
 import io
 import math
-import tensorflow as tf
-import numpy as np
+import json
 import random
+import visualkeras
+import numpy as np
+import tensorflow as tf
 import matplotlib.pyplot as plt
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
+# Callback function on every epoch end to check training accuracy.
+class Callback(tf.keras.callbacks.Callback):
+    def on_epoch_end(self, epoch, logs={}):
+        if logs.get('accuracy') > 0.98:
+            print("Reached accuracy threshold.")
+            self.model.stop_training = True
+
 
 class Classifier:
+    callback = Callback()
     oov_tok = '<OOV>'
-    vocab_size = 8000
+    vocab_size = 250
     max_length = 0
     padding_type = 'post'
-    embedding_dim = 64
-    num_epochs = 25
+    # Embedding vector dimension should be the 4th root of the number of categories.
+    embedding_dim = 100
+    num_epochs = 80
     val_ratio = .25  # Ratio of validation data vs test data
-    root_folder = 'dataset2'
+    root_folder = 'dataset3'
     train_padded, train_label_seq, validation_padded, validation_label_seq = "", "", "", ""
     categories_index = {}
     word_index = []
@@ -71,7 +82,8 @@ class Classifier:
 
         # Tokenized validation sequences.
         self.validation_sequences = tokenizer.texts_to_sequences(word_sequences[num_train:])
-        self.validation_padded = pad_sequences(self.validation_sequences, padding=self.padding_type, maxlen=self.max_length)
+        self.validation_padded = pad_sequences(self.validation_sequences, padding=self.padding_type,
+                                               maxlen=self.max_length)
 
         # Train label seq as dictionary values.
         self.train_label_seq = [self.categories_index.get(seq) for seq in categories[:num_train]]
@@ -83,22 +95,23 @@ class Classifier:
 
     def train_model(self):
         # Keras embedding layer initialization
-        embedding_layer = tf.keras.layers.Embedding(self.vocab_size, self.embedding_dim, input_length=self.max_length)
+        embedding_layer = tf.keras.layers.Embedding(input_dim=self.vocab_size, output_dim=self.embedding_dim, input_length=self.max_length)
 
         # NN Model with embedding layer.
         model = tf.keras.Sequential([
             embedding_layer,
             tf.keras.layers.GlobalMaxPool1D(),
-            tf.keras.layers.Dense(64, activation='relu'),
             tf.keras.layers.Dense(16, activation='relu'),
             tf.keras.layers.Dense(4, activation='softmax')
         ])
 
-        model.compile(loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+
+        model.compile(loss='sparse_categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
         model.summary()
 
         history = model.fit(x=self.train_padded, y=self.train_label_seq, epochs=self.num_epochs,
-                            validation_data=(self.validation_padded, self.validation_label_seq), verbose=2)
+                            validation_data=(self.validation_padded, self.validation_label_seq), verbose=2,
+                            callbacks=[self.callback])
 
         return history, model
 
@@ -145,6 +158,9 @@ class Classifier:
         out_v.close()
         out_m.close()
 
+
+
+
     def plot_graphs(self, history, string):
         plt.plot(history.history[string])
         plt.plot(history.history['val_' + string])
@@ -155,5 +171,8 @@ class Classifier:
 
     def decode_sentence(self, text, reverse_word_index):
         return ' '.join([reverse_word_index.get(i, '?') for i in text])
+
+
+
 
 Classifier()

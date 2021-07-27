@@ -67,7 +67,7 @@ def generate_dataset(topic, root_folder, desired_records):
         url = f'https://www.google.com/search?{params}'
 
         # Add 2 second sleep to avoid getting blacklisted by google.
-        time.sleep(3)
+        time.sleep(5)
         response = requests.get(url, headers=headers, timeout=2)
         if response.status_code == 429:
             print("Scraper detected")
@@ -117,25 +117,10 @@ def generate_dataset(topic, root_folder, desired_records):
 def extract_text(soup_string):
     output = ""
     d = enchant.Dict("en_US")
-    words_in_dict = 0
 
     # 75% of the words should in the en_US enchant dict.
     min_allowance = 0.75
 
-    # Black certain tag names from the soup results.
-    blacklist = [
-        '[document]',
-        'noscript',
-        'header',
-        'html',
-        'meta',
-        'head',
-        'input',
-        'script',
-        'style',
-        'a',
-        'footer'
-    ]
 
     # Stop words that are common in text documents. I.e not helpful for text analysis.
     stopwords = ["icon", "external", "plus", "font", "header", "empty", "noscript", "lynx", "br", "flyout", "ff", "text", "react", "div", "a", "about", "above", "after", "again", "against", "all", "am",
@@ -173,9 +158,9 @@ def extract_text(soup_string):
 
 def main():
     #r = requests.get('https://httpbin.org/ip')
-    root_folder = 'dataset2'
+    root_folder = 'dataset3'
     topics = ["technology", "gardening", "health"]
-    num_examples = 80
+    num_examples = 100
     try:
         os.mkdir(root_folder)
     except FileExistsError:
