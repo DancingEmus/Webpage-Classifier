@@ -1,6 +1,6 @@
-# WebClassifier
-Classifies novel webpages with training data scraped using custom webscraper.
+# Webpage Text Classifier with CBOW Model
 
-Trained a deep neural network with an embedding layer created with tokenized web text. 
+Classifies novel webpages with training data scraped using custom webscraper.
+Trained on a CBOW model with a dense word embedding trained on scraped website text.
 
 ![Image](accuracy.png)
